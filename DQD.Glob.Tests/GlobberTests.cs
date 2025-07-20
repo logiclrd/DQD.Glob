@@ -173,6 +173,31 @@ public class GlobberTests
 		}
 	}
 
+	public void GetMatches_should_ignore_case_when_asked()
+	{
+		// Arrange
+		using (var dir = new TestDirectory())
+		{
+			string[] expectedResults = ["First/A.txt", "First/B.txt", "Second/A.txt", "Third/B.txt"];
+
+			// Act
+			var results = Globber.GetMatches(dir.FullPath, "*/*.TXT", ignoreCase: true);
+
+			// Assert
+			var actualResults = new List<string>();
+
+			foreach (var match in results)
+			{
+				string actualFullPath = match.FullName;
+
+				if (!actualFullPath.StartsWith(dir.FullPath))
+					Assert.Fail("Got a match whose path didn't start with " + dir.FullPath + ": " + actualFullPath);
+
+				string actualRelativePath = actualFullPath.Substring(dir.FullPath.Length).TrimStart(Path.DirectorySeparatorChar);
+			}
+		}
+	}
+
 	// TODO: possible to make generalized tests from root??
 
 	[TestCase("/test", "/test")]
@@ -187,7 +212,7 @@ public class GlobberTests
 		var result = globber.IsMatch(testPath);
 
 		// Assert
-		result.Should().Be(true);
+		result.Should().BeTrue();
 	}
 
 	[TestCase("test", "/test")]
@@ -203,21 +228,22 @@ public class GlobberTests
 		var result = globber.IsMatch(testPath);
 
 		// Assert
-		result.Should().Be(false);
+		result.Should().BeFalse();
 	}
 
-	[TestCase("First/*.txt", "First/A.txt", true)]
-	[TestCase("First/*.txt", "First/C.txt", false)]
-	public void IsMatch_should_use_context_when_expression_is_rooted(string testExpressionSuffix, string testPath, bool expectedResult)
+	[TestCase("First/*.txt", "First/A.txt", true, true)]
+	[TestCase("First/*.txt", "First/A.txt", false, false)]
+	public void IsMatch_should_use_context_when_expression_is_rooted(string testExpressionSuffix, string testPath, bool setCurrentDirectoryToTestPath, bool expectedResult)
 	{
 		// Arrange
 		using (var dir = new TestDirectory())
 		{
-			Environment.CurrentDirectory = dir.FullPath;
-
 			string testExpression = Path.Combine(dir.FullPath, testExpressionSuffix);
 
 			var globber = new Globber(testExpression);
+
+			if (setCurrentDirectoryToTestPath)
+				Environment.CurrentDirectory = dir.FullPath;
 
 			// Act
 			var result = globber.IsMatch(testPath);
@@ -234,6 +260,16 @@ public class GlobberTests
 		var result = Globber.IsMatch("foo", Array.Empty<Regex>(), false);
 
 		// Assert
-		result.Should().Be(false);
+		result.Should().BeFalse();
+	}
+
+	[Test]
+	public void IsMatch_should_ignore_case_when_asked()
+	{
+		// Act
+		var result = Globber.IsMatch("FILE.TXT", "*.txt", ignoreCase: true);
+
+		// Assert
+		result.Should().BeTrue();
 	}
 }

@@ -53,18 +53,18 @@ public class Globber
 			return (baseDirectory.ToString(), pattern);
 	}
 
-	public static IEnumerable<FileSystemInfo> GetMatches(string path, string glob)
+	public static IEnumerable<FileSystemInfo> GetMatches(string path, string glob, bool ignoreCase = false)
 	{
-		return GetMatches(path, glob.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries));
+		return GetMatches(path, glob.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries), ignoreCase);
 	}
 
-	public static IEnumerable<FileSystemInfo> GetMatches(string path, ArraySegment<string> components)
+	public static IEnumerable<FileSystemInfo> GetMatches(string path, ArraySegment<string> components, bool ignoreCase = false)
 	{
 		if (components.Count > 0)
 		{
 			var directory = new DirectoryInfo(path);
 
-			return GetMatches(directory, components);
+			return GetMatches(directory, components, ignoreCase);
 		}
 
 		return Array.Empty<FileSystemInfo>();
@@ -82,26 +82,26 @@ public class Globber
 		return Array.Empty<FileSystemInfo>();
 	}
 
-	public static IEnumerable<FileSystemInfo> GetMatchesFromRoot(string glob)
+	public static IEnumerable<FileSystemInfo> GetMatchesFromRoot(string glob, bool ignoreCase = false)
 	{
 		glob = glob.TrimStart(s_PathSeparatorChars);
 
 		if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 		{
 			foreach (var driveInfo in DriveInfo.GetDrives())
-				foreach (var match in GetMatches(driveInfo.RootDirectory, driveInfo.RootDirectory + glob))
+				foreach (var match in GetMatches(driveInfo.RootDirectory, driveInfo.RootDirectory + glob, ignoreCase = false))
 					yield return match;
 		}
 		else
 		{
 			var root = new DirectoryInfo(Path.DirectorySeparatorChar.ToString());
 
-			foreach (var match in GetMatches(root, root + glob))
+			foreach (var match in GetMatches(root, root + glob, ignoreCase))
 				yield return match;
 		}
 	}
 
-	public static IEnumerable<FileSystemInfo> GetMatches(DirectoryInfo directory, string glob)
+	public static IEnumerable<FileSystemInfo> GetMatches(DirectoryInfo directory, string glob, bool ignoreCase = false)
 	{
 		if (Path.IsPathRooted(glob))
 		{
@@ -109,32 +109,32 @@ public class Globber
 				.Trim(s_PathSeparatorChars)
 				.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries);
 
-			return GetMatches(new ArraySegment<string>(leader), directory, glob.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries));
+			return GetMatches(new ArraySegment<string>(leader), directory, glob.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries), ignoreCase);
 		}
 		else
-			return GetMatches(directory, glob.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries));
+			return GetMatches(directory, glob.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries), ignoreCase);
 
 			throw new ArgumentException("Cannot enumerate matches starting from a specified subdirectory with a rooted glob expression");
 
 	}
 
-	public static IEnumerable<FileSystemInfo> GetMatches(DirectoryInfo directory, ArraySegment<string> components)
-		=> GetMatches(Array.Empty<string>(), directory, components);
+	public static IEnumerable<FileSystemInfo> GetMatches(DirectoryInfo directory, ArraySegment<string> components, bool ignoreCase = false)
+		=> GetMatches(Array.Empty<string>(), directory, components, ignoreCase);
 
-	static IEnumerable<FileSystemInfo> GetMatches(ArraySegment<string> leader, DirectoryInfo directory, ArraySegment<string> components)
+	static IEnumerable<FileSystemInfo> GetMatches(ArraySegment<string> leader, DirectoryInfo directory, ArraySegment<string> components, bool ignoreCase)
 	{
 		var componentExpressions = new List<Regex>();
 
 		foreach (var pattern in components)
-			componentExpressions.Add(MakeRegularExpressionForPattern(pattern));
+			componentExpressions.Add(MakeRegularExpressionForPattern(pattern, ignoreCase));
 
 		return GetMatches(leader, directory, componentExpressions.ToArray());
 	}
 
-	static Regex MakeRegularExpressionForPattern(string pattern)
+	static Regex MakeRegularExpressionForPattern(string pattern, bool ignoreCase)
 	{
 		if (pattern.IndexOfAny(s_PatternChars) < 0)
-			return new Regex("^" + Regex.Escape(pattern) + "$");
+			return new Regex("^" + Regex.Escape(pattern) + "$", ignoreCase ? RegexOptions.IgnoreCase : default);
 
 		var expression = new StringBuilder();
 
@@ -152,7 +152,7 @@ public class Globber
 
 		expression.Append('$');
 
-		return new Regex(expression.ToString());
+		return new Regex(expression.ToString(), ignoreCase ? RegexOptions.IgnoreCase : default);
 	}
 
 	public static IEnumerable<FileSystemInfo> GetMatches(DirectoryInfo directory, ArraySegment<Regex> components)
@@ -215,6 +215,13 @@ public class Globber
 		return path.TrimStart(s_PathSeparatorChars);
 	}
 
+	public static bool IsMatch(string path, string globExpression, bool ignoreCase = false)
+	{
+		var globber = new Globber(globExpression, ignoreCase);
+
+		return globber.IsMatch(path);
+	}
+
 	public static bool IsMatch(string path, ArraySegment<Regex> components, bool isRooted)
 	{
 		if (Path.IsPathRooted(path))
@@ -231,7 +238,7 @@ public class Globber
 		}
 
 		if (components.Count == 0)
-				return false;
+			return false;
 
 		var thisComponent = components[0];
 		var subcomponents = components.Slice(1);
@@ -259,13 +266,13 @@ public class Globber
 	Regex[] _components;
 	bool _isRooted;
 
-	public Globber(string glob)
-		: this(glob.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries), Path.IsPathRooted(glob))
+	public Globber(string glob, bool ignoreCase = false)
+		: this(glob.Split(s_PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries), Path.IsPathRooted(glob), ignoreCase)
 	{
 	}
 
-	public Globber(string[] components, bool isRooted)
-		: this(components.Select(MakeRegularExpressionForPattern).ToArray(), isRooted)
+	public Globber(string[] components, bool isRooted, bool ignoreCase = false)
+		: this(components.Select(component => MakeRegularExpressionForPattern(component, ignoreCase)).ToArray(), isRooted)
 	{
 	}
 

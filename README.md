@@ -19,7 +19,7 @@ foreach (var matchingFile in Globber.GetMatches(baseDir, relativePattern))
 You can create an instance of `Globber` to allow multiple tests against the same globbing expression:
 
 ```
-var globber = new Globber("**/*.mp3");
+var globber = new Globber("**/*.mp3", ignoreCase: true);
 
 foreach (var relativeFilePath in archiveContents)
   if (globber.IsMatch(relativeFilePath))
