@@ -16,6 +16,16 @@ foreach (var matchingFile in Globber.GetMatches(baseDir, relativePattern))
     Console.WriteLine("Looks like a text file but is actually a directory: ", matchingFile.FullName);
 ```
 
+You can create an instance of `Globber` to allow multiple tests against the same globbing expression:
+
+```
+var globber = new Globber("**/*.mp3");
+
+foreach (var relativeFilePath in archiveContents)
+  if (globber.IsMatch(relativeFilePath))
+    Console.WriteLine("Found an MP3 file: {0}", relativeFilePath);
+```
+
 ## Source Code
 
 The repository for this library's source code is found at:
