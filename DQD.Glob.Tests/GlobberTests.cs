@@ -198,6 +198,41 @@ public class GlobberTests
 		}
 	}
 
+	[TestCase("**/A.txt", "**/B.txt", "First/A.txt|First/B.txt|Second/A.txt|Second/Nested/B.txt|Third/B.txt")]
+	public void GetMatches_should_support_multiple_expressions(string firstExpression, string secondExpression, string expectedResultsPacked)
+	{
+		// Arrange
+		using (var dir = new TestDirectory())
+		{
+			var expectedResults = expectedResultsPacked.Split('|').ToHashSet();
+
+			// Act
+			var matches = Globber.GetMatches(dir.FullPath, [firstExpression, secondExpression]);
+
+			// Assert
+			var actualResults = new HashSet<string>();
+
+			foreach (var match in matches)
+			{
+				string actualFullPath = match.FullName;
+
+				if (!actualFullPath.StartsWith(dir.FullPath))
+					Assert.Fail("Got a match whose path didn't start with " + dir.FullPath + ": " + actualFullPath);
+
+				string actualRelativePath = actualFullPath.Substring(dir.FullPath.Length).TrimStart(Path.DirectorySeparatorChar);
+
+				if (!expectedResults.Contains(actualRelativePath))
+					Assert.Fail("Got unexpected result: " + actualRelativePath);
+
+				actualResults.Add(actualRelativePath);
+			}
+
+			foreach (var expected in expectedResults)
+				if (!actualResults.Contains(expected))
+					Assert.Fail("Did not get expected result: " + expected);
+		}
+	}
+
 	// TODO: possible to make generalized tests from root??
 
 	[TestCase("/test", "/test")]
@@ -271,5 +306,25 @@ public class GlobberTests
 
 		// Assert
 		result.Should().BeTrue();
+	}
+
+	[Test]
+	public void IsMatch_should_support_multiple_expressions()
+	{
+		// Arrange
+		var globber = new Globber();
+
+		globber.AddExpression("a.txt");
+		globber.AddExpression("b.m*");
+
+		// Act
+		var result1 = globber.IsMatch("a.txt");
+		var result2 = globber.IsMatch("b.mod");
+		var result3 = globber.IsMatch("c.xls");
+
+		// Assert
+		result1.Should().BeTrue();
+		result2.Should().BeTrue();
+		result3.Should().BeFalse();
 	}
 }
