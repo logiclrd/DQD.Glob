@@ -26,6 +26,19 @@ foreach (var relativeFilePath in archiveContents)
     Console.WriteLine("Found an MP3 file: {0}", relativeFilePath);
 ```
 
+You can supply multiple expressions to be applied simultaneously:
+
+```
+var globber = new Globber();
+
+globber.AddExpression("**/*.mod", ignoreCase: true);
+globber.AddExpression("**/*.xm", ignoreCase: true);
+globber.AddExpression("**/*.s3m", ignoreCase: true);
+globber.AddExpression("**/*.it", ignoreCase: true);
+
+var modules = globber.GetMatches(modulesDirectory);
+```
+
 ## Source Code
 
 The repository for this library's source code is found at:
